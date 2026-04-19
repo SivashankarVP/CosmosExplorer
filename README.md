@@ -34,11 +34,13 @@ I am a passionate **AI & Front-end Developer** focused on creating immersive, hu
 
 *   🌍 **Pure Core Interface** – All text elements and HUD clutter have been removed for a cinematic, first-person exploration experience.
 *   🦾 **Right-Hand Precision** – Optimized specifically for right-hand tracking, filtering out background noise for reliable control.
-*   🌫️ **Holographic Skeleton** – A stylized digital "Neural Link" overlay represents your hand on-screen in real-time.
+*   🧠 **Neural Stabilization** – Majority-vote gesture buffering eliminates "flickering" between different hand states.
+*   🚀 **Inertial Physics Zoom** – Pinching now has "weight" and momentum, allowing for smooth, professional-grade zoom transitions.
+*   🌫️ **Holographic Skeleton** – A stylized digital "Neural Link" overlay with real-time data flow ribbons.
 *   🌊 **Fluid Momentum** – Advanced Exponential Moving Average (EMA) smoothing for organic, jitter-free camera movement.
+*   🕯️ **Interactive Glow** – A responsive holographic light source follows your hand position across the interface.
 *   🛸 **Stealth Cam** – Camera video is processed in the background and hidden from the UI to maintain total immersion.
-*   ☄️ **Interactive Orbitals** – Manage planetary rings, asteroid belts, and deep-space probes with natural movements.
-*   ✨ **Neon Reticle** – A pulsing, minimalist targeter that follows your index finger for object inspection.
+
 
 ---
 

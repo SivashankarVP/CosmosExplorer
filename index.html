@@ -46,6 +46,25 @@ body::after {
   display: block;
 }
 
+/* UI Glitch/Pulse effects */
+#spaceCanvas.zoom-pulse {
+  filter: saturate(1.5) brightness(1.2) contrast(1.1);
+  transition: filter 0.1s;
+}
+
+#interfaceGlow {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at var(--hx, 50%) var(--hy, 50%), rgba(0,229,255,0.08) 0%, transparent 40%);
+  pointer-events: none;
+  z-index: 5;
+  mix-blend-mode: screen;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+#interfaceGlow.active { opacity: 1; }
+
+
 /* ═══════════════════════════════════ LOADER */
 #loader {
   position: fixed; inset: 0;
@@ -427,8 +446,10 @@ body::after {
   <div class="loader-bar-wrap"><div class="loader-bar-fill"></div></div>
   <div id="loaderStatus" class="loader-sub">INITIALIZING SCENE...</div>
   <div id="gestureFeedback">STANDBY</div>
-
 </div>
+
+<div id="interfaceGlow"></div>
+
 
 <!-- THREE.JS CANVAS -->
 <canvas id="spaceCanvas"></canvas>
@@ -1022,9 +1043,23 @@ function animate() {
     (2.76 + Math.sin(t*0.09)*0.022).toFixed(3) + ' AU';
 
   drawRadar();
+  
+  // Apply Physics to Camera Zoom
+  targetRadius += zoomVelocity;
+  zoomVelocity *= ZOOM_FRICTION;
+  
+  const sph = new THREE.Spherical().setFromVector3(camera.position);
+  // Inertial radius dampening
+  sph.radius += (targetRadius - sph.radius) * 0.15;
+  sph.radius = Math.max(controls.minDistance, Math.min(controls.maxDistance, sph.radius));
+  
+  camera.position.setFromSpherical(sph);
+  camera.lookAt(0, 0, 0);
+
   controls.update();
   renderer.render(scene, camera);
 }
+
 
 animate();
 
@@ -1088,15 +1123,25 @@ const GESTURE_CFG = {
 };
 
 let currentGesture = 'none';
+let gestureBuffer = [];
+const BUFFER_SIZE = 5;
+
 let prevHandX = null, prevHandY = null, prevPinchDist = null;
 let smoothX = 0, smoothY = 0;
-const SMOOTH_FACTOR = 0.12; // Even smoother
+const SMOOTH_FACTOR = 0.1; // Even smoother for "physics" feel
 
-// Landmarks smoothing for the skeleton
+// Physics-based Zooming
+let targetRadius = 560;
+let zoomVelocity = 0;
+const ZOOM_FRICTION = 0.88;
+const ZOOM_SENSE = 2400;
+
+// Landmarks smoothing
 let smoothLandmarks = null;
-const LM_SMOOTH = 0.25;
+const LM_SMOOTH = 0.2;
 
 let fistCooldown = false, peaceCooldown = false, shakaCooldown = false;
+
 
 
 
@@ -1198,34 +1243,47 @@ function handleGesture(g, lm) {
       
       const dx = smoothX - prevHandX;
       const dy = smoothY - prevHandY;
+      
       const sph = new THREE.Spherical().setFromVector3(camera.position);
-      sph.theta -= dx * 4.5;
-      sph.phi   += dy * 3;
+      sph.theta -= dx * 5.2;
+      sph.phi   += dy * 3.8;
       sph.phi    = Math.max(0.1, Math.min(Math.PI - 0.1, sph.phi));
       camera.position.setFromSpherical(sph);
       camera.lookAt(0, 0, 0);
     }
+
+    
+    // UI Glow follows hand
+    const glow = document.getElementById('interfaceGlow');
+    glow.style.setProperty('--hx', (1 - smoothX) * 100 + '%');
+    glow.style.setProperty('--hy', smoothY * 100 + '%');
+    glow.classList.add('active');
+
     prevHandX = smoothX;
     prevHandY = smoothY;
     return;
   }
 
 
-  // Zoom: pinch distance
+
+  // Zoom: pinch with physics
   if (g === 'pinch') {
     controls.autoRotate = false;
     const pd = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
     if (prevPinchDist !== null) {
       const delta = prevPinchDist - pd;
-      const sph = new THREE.Spherical().setFromVector3(camera.position);
-      sph.radius = Math.max(controls.minDistance, Math.min(controls.maxDistance, sph.radius + delta * 1400));
-      camera.position.setFromSpherical(sph);
-      camera.lookAt(0, 0, 0);
+      // Add to velocity for inertia
+      zoomVelocity += delta * ZOOM_SENSE;
+      
+      // Visual feedback pulse
+      canvas.classList.add('zoom-pulse');
+      setTimeout(() => canvas.classList.remove('zoom-pulse'), 100);
     }
     prevPinchDist = pd;
   } else {
     prevPinchDist = null;
   }
+
 
   prevHandX = wrist.x;
   prevHandY = wrist.y;
@@ -1275,7 +1333,14 @@ function drawHandLandmarks(lm, w, h) {
     gestCtx.moveTo((1 - smoothLandmarks[a].x) * w, smoothLandmarks[a].y * h);
     gestCtx.lineTo((1 - smoothLandmarks[b].x) * w, smoothLandmarks[b].y * h);
     gestCtx.stroke();
+    
+    // Add glowing "Ribbons" or "Data Flow" on lines
+    if (Math.random() > 0.92) {
+      gestCtx.fillStyle = 'white';
+      gestCtx.fillRect((1 - smoothLandmarks[a].x) * w, smoothLandmarks[a].y * h, 2, 2);
+    }
   }
+
   
   for (let i = 0; i < 21; i++) {
     const x = (1 - smoothLandmarks[i].x) * w;
@@ -1326,12 +1391,13 @@ function initMediaPipe() {
       if (handIdx === -1) {
         currentGesture = 'none';
         setGestureUI('none');
+        document.getElementById('interfaceGlow').classList.remove('active');
         return;
       }
 
       const lm = results.multiHandLandmarks[handIdx];
       
-      // Update canvas size to match window
+      // Update canvas size
       if (gestCanvas.width !== window.innerWidth || gestCanvas.height !== window.innerHeight) {
         gestCanvas.width = window.innerWidth;
         gestCanvas.height = window.innerHeight;
@@ -1339,15 +1405,21 @@ function initMediaPipe() {
       
       drawHandLandmarks(lm, gestCanvas.width, gestCanvas.height);
 
-      const g = classifyHand(lm);
+      const rawG = classifyHand(lm);
+      
+      // Stabilize gesture with buffer (majority vote)
+      gestureBuffer.push(rawG);
+      if (gestureBuffer.length > BUFFER_SIZE) gestureBuffer.shift();
+      
+      const counts = {};
+      gestureBuffer.forEach(x => counts[x] = (counts[x] || 0) + 1);
+      const g = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
 
       if (g !== currentGesture) {
         currentGesture = g;
         setGestureUI(g);
-        // Visual feedback for gesture change
         if (g !== 'none' && g !== 'unknown') {
-          const cfg = GESTURE_CFG[g];
-          showNotif('◈ ' + cfg.name);
+          showNotif('◈ ' + GESTURE_CFG[g].name);
         }
       }
       
@@ -1355,10 +1427,13 @@ function initMediaPipe() {
       handleGesture(g, lm);
     } else {
       currentGesture = 'none';
+      gestureBuffer = [];
       setGestureUI('none');
+      document.getElementById('interfaceGlow').classList.remove('active');
       prevHandX = prevHandY = prevPinchDist = null;
       document.getElementById('reticle').style.opacity = '0';
     }
+
   });
 }
 
