@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COSMOS EXPLORER — Gesture Interface</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cyan: #00e5ff;
+  --blue: #0055ff;
+  --green: #00ff88;
+  --bg: #000308;
+  --panel-bg: rgba(0,6,28,0.88);
+  --border: rgba(0,229,255,0.28);
+  --glow-cyan: 0 0 18px rgba(0,229,255,0.5);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  overflow: hidden;
+  font-family: 'Orbitron', 'Share Tech Mono', monospace;
+  color: var(--cyan);
+  cursor: crosshair;
+  user-select: none;
+}
+
+#radar { display: none !important; }
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, transparent 40%, rgba(0,229,255,0.05) 100%);
+  pointer-events: none;
+  z-index: 1000;
+}
+
+
+#spaceCanvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: block;
+}
+
+/* ═══════════════════════════════════ LOADER */
+#loader {
+  position: fixed; inset: 0;
+  background: #000;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  transition: opacity 1.2s ease;
+}
+.loader-logo {
+  font-family: 'Orbitron', monospace;
+  font-size: 48px;
+  font-weight: 900;
+  letter-spacing: 0.55em;
+  color: var(--cyan);
+  text-shadow: 0 0 60px rgba(0,229,255,0.7), 0 0 120px rgba(0,229,255,0.3);
+  animation: logoPulse 2s ease-in-out infinite;
+}
+@keyframes logoPulse { 0%,100%{opacity:1;} 50%{opacity:0.75;} }
+.loader-sub {
+  font-size: 10px;
+  letter-spacing: 0.45em;
+  opacity: 0.45;
+  text-transform: uppercase;
+}
+.loader-bar-wrap {
+  width: 320px;
+  height: 1px;
+  background: rgba(0,229,255,0.12);
+  border: 1px solid rgba(0,229,255,0.18);
+  overflow: hidden;
+  position: relative;
+}
+.loader-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  width: 0%;
+  animation: barFill 2.2s cubic-bezier(.4,0,.2,1) forwards;
+  box-shadow: 0 0 12px var(--cyan);
+}
+@keyframes barFill { to { width: 100%; } }
+#loaderStatus {
+  font-size: 9px;
+  letter-spacing: 0.25em;
+  opacity: 0.4;
+}
+
+/* ═══════════════════════════════════ HUD OVERLAY */
+#hud {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Corner brackets */
+.hud-corner {
+  position: absolute;
+  width: 48px; height: 48px;
+}
+.hud-corner.tl { top:14px; left:14px; border-top:1px solid var(--cyan); border-left:1px solid var(--cyan); }
+.hud-corner.tr { top:14px; right:14px; border-top:1px solid var(--cyan); border-right:1px solid var(--cyan); }
+.hud-corner.bl { bottom:14px; left:14px; border-bottom:1px solid var(--cyan); border-left:1px solid var(--cyan); }
+.hud-corner.br { bottom:14px; right:14px; border-bottom:1px solid var(--cyan); border-right:1px solid var(--cyan); }
+
+/* Scan line */
+.scan-beam {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--cyan) 50%, transparent 100%);
+  opacity: 0.22;
+  animation: scanBeam 8s linear infinite;
+}
+@keyframes scanBeam { 0%{top:0;} 100%{top:100%;} }
+
+/* Top bar */
+.hud-top-bar {
+  position: absolute;
+  top: 22px; left: 72px; right: 72px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.hud-main-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.38em;
+  text-shadow: var(--glow-cyan);
+}
+.hud-mission-tag {
+  font-size: 9px;
+  letter-spacing: 0.28em;
+  opacity: 0.45;
+  margin-top: 4px;
+}
+.hud-sys-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  opacity: 0.75;
+}
+.status-pulse {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green);
+  animation: pulseDot 2.4s ease-in-out infinite;
+}
+@keyframes pulseDot { 0%,100%{opacity:1;} 60%{opacity:0.2;} }
+
+/* Info panels */
+.panel {
+  position: absolute;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  padding: 13px 16px;
+  min-width: 196px;
+  backdrop-filter: blur(8px);
+}
+.panel::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 10%; right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  opacity: 0.5;
+}
+.panel-hdr {
+  font-family: 'Orbitron', monospace;
+  font-size: 8px;
+  letter-spacing: 0.35em;
+  opacity: 0.5;
+  margin-bottom: 11px;
+}
+.panel-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 6px 0;
+  font-size: 9.5px;
+  gap: 16px;
+}
+.panel-lbl { opacity: 0.45; letter-spacing: 0.08em; }
+.panel-val { color: #e8f4ff; letter-spacing: 0.06em; }
+.panel-val.hi { color: var(--cyan); text-shadow: var(--glow-cyan); }
+.panel-val.ok { color: var(--green); text-shadow: 0 0 8px var(--green); }
+
+#panelStats { top: 68px; left: 20px; }
+#panelObject { top: 68px; right: 20px; }
+
+/* Altitude indicator - center bottom */
+.hud-compass-ring {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px; height: 80px;
+  opacity: 0.3;
+}
+.hud-compass-ring svg {
+  width: 100%; height: 100%;
+  animation: spinSlow 30s linear infinite;
+}
+@keyframes spinSlow { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════════════ GESTURE PANEL */
+#gesturePanel {
+  position: fixed;
+  bottom: 22px; left: 22px;
+  z-index: 20;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  width: 234px;
+  backdrop-filter: blur(10px);
+  pointer-events: all;
+}
+#gesturePanel::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 10%; right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  opacity: 0.5;
+}
+.gp-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 8px;
+  letter-spacing: 0.35em;
+  opacity: 0.5;
+  margin-bottom: 12px;
+}
+.gp-active-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(0,229,255,0.15);
+  background: rgba(0,229,255,0.03);
+  margin-bottom: 11px;
+  transition: border-color 0.3s, background 0.3s;
+}
+.gp-active-display.triggered {
+  border-color: rgba(0,229,255,0.5);
+  background: rgba(0,229,255,0.07);
+}
+#gpEmoji { font-size: 26px; line-height: 1; }
+.gp-text-block { flex: 1; }
+#gpName {
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  color: #fff;
+  letter-spacing: 0.15em;
+}
+#gpAction {
+  font-size: 8.5px;
+  color: var(--cyan);
+  opacity: 0.65;
+  letter-spacing: 0.1em;
+  margin-top: 3px;
+}
+.gp-led {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #1a2a3a;
+  border: 1px solid rgba(0,229,255,0.2);
+  transition: background 0.25s, box-shadow 0.25s;
+  flex-shrink: 0;
+}
+.gp-led.lit {
+  background: var(--cyan);
+  box-shadow: 0 0 12px var(--cyan), 0 0 24px rgba(0,229,255,0.4);
+}
+
+.gp-ref-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+.gp-ref {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 8.5px;
+  padding: 5px 7px;
+  border: 1px solid rgba(0,229,255,0.1);
+  opacity: 0.55;
+  transition: opacity 0.25s, border-color 0.25s, background 0.25s;
+}
+.gp-ref.hi {
+  opacity: 1;
+  border-color: rgba(0,229,255,0.45);
+  background: rgba(0,229,255,0.06);
+}
+.gp-ref-icon { font-size: 15px; line-height: 1; }
+.gp-ref-lbl { letter-spacing: 0.08em; }
+
+/* ═══════════════════════════════════ CAMERA PANEL */
+/* Hide camera and text elements per user request */
+#cameraPanel, #panelStats, #panelObject, .hud-top-bar, #gesturePanel, .hud-corner, .hud-mission-tag, .hud-sys-status {
+  display: none !important;
+}
+
+#gestureCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 40;
+  pointer-events: none;
+}
+
+
+/* New minimal gesture feedback */
+#gestureFeedback {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.5em;
+  color: var(--cyan);
+  text-shadow: 0 0 20px var(--cyan);
+  text-transform: uppercase;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s, transform 0.4s;
+  z-index: 1000;
+}
+#gestureFeedback.active {
+  opacity: 0.8;
+  transform: translateX(-50%) translateY(-10px);
+}
+
+/* Premium full-screen reticle - No crosshair (+) */
+#reticle {
+  position: fixed;
+  width: 50px; height: 50px;
+  transform: translate(-50%,-50%);
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.1s cubic-bezier(0.2, 0, 0.2, 1);
+}
+.reticle-dot {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 4px; height: 4px;
+  background: var(--cyan);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 10px var(--cyan);
+  animation: dotPulse 1.5s ease-in-out infinite;
+}
+@keyframes dotPulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(1.8); opacity: 0.6; }
+}
+
+.reticle-ring {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0,229,255,0.5);
+  box-shadow: 0 0 15px rgba(0,229,255,0.3);
+  animation: reticleSpin 5s linear infinite;
+}
+@keyframes reticleSpin { to { transform: rotate(360deg); } }
+
+
+
+/* ═══════════════════════════════════ NOTIFICATION */
+#notification {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Orbitron', monospace;
+  font-size: 13px;
+  letter-spacing: 0.35em;
+  color: var(--cyan);
+  text-shadow: var(--glow-cyan);
+  padding: 11px 30px;
+  border: 1px solid rgba(0,229,255,0.45);
+  background: rgba(0,6,24,0.85);
+  backdrop-filter: blur(6px);
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  white-space: nowrap;
+}
+#notification.show { opacity: 1; }
+
+/* ═══════════════════════════════════ MINI RADAR */
+#radar {
+  position: fixed;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  pointer-events: none;
+}
+#radar canvas {
+  display: block;
+}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="loader-logo">COSMOS</div>
+  <div class="loader-sub">Deep Space Explorer — Hand Gesture Interface</div>
+  <div class="loader-bar-wrap"><div class="loader-bar-fill"></div></div>
+  <div id="loaderStatus" class="loader-sub">INITIALIZING SCENE...</div>
+  <div id="gestureFeedback">STANDBY</div>
+
+</div>
+
+<!-- THREE.JS CANVAS -->
+<canvas id="spaceCanvas"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-corner tl"></div>
+  <div class="hud-corner tr"></div>
+  <div class="hud-corner bl"></div>
+  <div class="hud-corner br"></div>
+  <div class="scan-beam"></div>
+
+  <div class="hud-top-bar">
+    <div>
+      <div class="hud-main-title">◈ COSMOS EXPLORER</div>
+      <div class="hud-mission-tag">MISSION DEEP SURVEY — SOL SYSTEM / SECTOR 7</div>
+    </div>
+    <div class="hud-sys-status">
+      <div class="status-pulse"></div>
+      <span>SYSTEMS NOMINAL</span>
+    </div>
+  </div>
+
+  <!-- Mission Telemetry Panel -->
+  <div class="panel" id="panelStats">
+    <div class="panel-hdr">◈ MISSION TELEMETRY</div>
+    <div class="panel-row"><span class="panel-lbl">MET</span><span class="panel-val" id="met">00:00:00</span></div>
+    <div class="panel-row"><span class="panel-lbl">OBJECTS</span><span class="panel-val hi">15,247</span></div>
+    <div class="panel-row"><span class="panel-lbl">PROBE ΔV</span><span class="panel-val">11.24 km/s</span></div>
+    <div class="panel-row"><span class="panel-lbl">DIST SOL</span><span class="panel-val" id="distSol">2.76 AU</span></div>
+    <div class="panel-row"><span class="panel-lbl">SIGNAL</span><span class="panel-val ok">██████░░ 82%</span></div>
+    <div class="panel-row"><span class="panel-lbl">TEMP</span><span class="panel-val">−189 °C</span></div>
+  </div>
+
+  <!-- Focal Object Panel -->
+  <div class="panel" id="panelObject">
+    <div class="panel-hdr">◈ FOCAL OBJECT</div>
+    <div class="panel-row"><span class="panel-lbl">DESIG.</span><span class="panel-val hi">KEPLER-442b</span></div>
+    <div class="panel-row"><span class="panel-lbl">CLASS</span><span class="panel-val">SUPER-EARTH</span></div>
+    <div class="panel-row"><span class="panel-lbl">RADIUS</span><span class="panel-val">1.34 R⊕</span></div>
+    <div class="panel-row"><span class="panel-lbl">MASS</span><span class="panel-val">2.34 M⊕</span></div>
+    <div class="panel-row"><span class="panel-lbl">TEMP EQ</span><span class="panel-val">233 K</span></div>
+    <div class="panel-row"><span class="panel-lbl">STATUS</span><span class="panel-val ok">HZ CONFIRMED</span></div>
+  </div>
+
+  <!-- Decorative compass ring at bottom center -->
+  <div class="hud-compass-ring">
+    <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="40" cy="40" r="36" stroke="#00e5ff" stroke-width="0.5" stroke-dasharray="4 6" opacity="0.6"/>
+      <circle cx="40" cy="40" r="28" stroke="#00e5ff" stroke-width="0.4" stroke-dasharray="2 8" opacity="0.4"/>
+      <line x1="40" y1="4" x2="40" y2="14" stroke="#00e5ff" stroke-width="0.8" opacity="0.8"/>
+      <line x1="40" y1="66" x2="40" y2="76" stroke="#00e5ff" stroke-width="0.8" opacity="0.8"/>
+      <line x1="4" y1="40" x2="14" y2="40" stroke="#00e5ff" stroke-width="0.8" opacity="0.8"/>
+      <line x1="66" y1="40" x2="76" y2="40" stroke="#00e5ff" stroke-width="0.8" opacity="0.8"/>
+      <circle cx="40" cy="40" r="2" fill="#00e5ff" opacity="0.7"/>
+    </svg>
+  </div>
+</div>
+
+<!-- GESTURE PANEL -->
+<div id="gesturePanel">
+  <div class="gp-title">◈ GESTURE INTERFACE</div>
+  <div class="gp-active-display" id="gpDisplay">
+    <span id="gpEmoji">🖐</span>
+    <div class="gp-text-block">
+      <div id="gpName">STANDBY</div>
+      <div id="gpAction">WAITING FOR INPUT</div>
+    </div>
+    <div class="gp-led" id="gpLed"></div>
+  </div>
+  <div class="gp-ref-grid">
+    <div class="gp-ref" id="ref-palm"><span class="gp-ref-icon">✋</span><span class="gp-ref-lbl">ORBIT</span></div>
+    <div class="gp-ref" id="ref-pinch"><span class="gp-ref-icon">🤏</span><span class="gp-ref-lbl">ZOOM</span></div>
+    <div class="gp-ref" id="ref-point"><span class="gp-ref-icon">☝️</span><span class="gp-ref-lbl">INSPECT</span></div>
+    <div class="gp-ref" id="ref-fist"><span class="gp-ref-icon">✊</span><span class="gp-ref-lbl">RESET</span></div>
+    <div class="gp-ref" id="ref-peace"><span class="gp-ref-icon">✌️</span><span class="gp-ref-lbl">TOGGLE</span></div>
+    <div class="gp-ref" id="ref-shaka"><span class="gp-ref-icon">🤙</span><span class="gp-ref-lbl">VIEW</span></div>
+  </div>
+</div>
+
+<!-- CAMERA PANEL -->
+<div id="cameraPanel">
+  <div class="cp-title">◈ GESTURE CAM</div>
+  <div class="cp-video-wrap">
+    <video id="camVideo" playsinline muted></video>
+    <div class="cp-placeholder" id="cpPlaceholder">
+      <div class="cp-placeholder-icon">📷</div>
+      <div>CAM OFFLINE</div>
+    </div>
+    <div class="cp-corner tl"></div>
+    <div class="cp-corner tr"></div>
+    <div class="cp-corner bl"></div>
+    <div class="cp-corner br"></div>
+  </div>
+  <button id="enableCamBtn">◈ ENABLE GESTURE CONTROL</button>
+</div>
+
+
+<!-- RADAR MINI -->
+<div id="radar"><canvas id="radarCanvas" width="80" height="80"></canvas></div>
+
+<!-- RETICLE -->
+<div id="reticle">
+  <div class="reticle-dot"></div>
+  <div class="reticle-ring"></div>
+
+</div>
+
+<!-- NOTIFICATION -->
+  <div id="notification"></div>
+  <div id="gestureFeedback"></div>
+  <canvas id="gestureCanvas" width="238" height="148"></canvas>
+
+
+
+<!-- Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js" crossorigin="anonymous"></script>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════
+// RENDERER & SCENE SETUP
+// ═══════════════════════════════════════════════════
+const canvas = document.getElementById('spaceCanvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x000308, 1);
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.5, 20000);
+camera.position.set(0, 180, 560);
+camera.lookAt(0, 0, 0);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.055;
+controls.minDistance = 110;
+controls.maxDistance = 2400;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.18;
+
+// Lights
+scene.add(new THREE.AmbientLight(0x001122, 3));
+const sunLight = new THREE.PointLight(0x2255ff, 2.2, 800);
+sunLight.position.set(0, 0, 0);
+scene.add(sunLight);
+
+// ═══════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════
+function randFloat(a, b) { return a + Math.random() * (b - a); }
+function randInt(a, b)   { return Math.floor(randFloat(a, b + 1)); }
+const TAU = Math.PI * 2;
+
+// ═══════════════════════════════════════════════════
+// STARFIELD
+// ═══════════════════════════════════════════════════
+(function buildStarfield() {
+  const N = 12000;
+  const pos   = new Float32Array(N * 3);
+  const col   = new Float32Array(N * 3);
+  const sizes = new Float32Array(N);
+
+  for (let i = 0; i < N; i++) {
+    const theta = randFloat(0, TAU);
+    const phi   = Math.acos(2 * Math.random() - 1);
+    const r     = randFloat(1200, 8000);
+    pos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+    pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+    pos[i*3+2] = r * Math.cos(phi);
+    sizes[i]   = Math.random() < 0.06 ? randFloat(2, 3.5) : randFloat(0.6, 1.4);
+
+    const t = Math.random();
+    if (t < 0.07) { col[i*3]=0;   col[i*3+1]=0.85; col[i*3+2]=1;   }  // cyan
+    else if (t < 0.13) { col[i*3]=0.3; col[i*3+1]=0.5; col[i*3+2]=1; } // blue-white
+    else { const v=randFloat(0.7,1); col[i*3]=v; col[i*3+1]=v; col[i*3+2]=v; }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 1.6, vertexColors: true, sizeAttenuation: true,
+    transparent: true, opacity: 0.92
+  });
+  scene.add(new THREE.Points(geo, mat));
+})();
+
+// Scattered large cyan squares (like images show distant belt objects)
+(function buildScatterDots() {
+  const N = 800;
+  const pos = new Float32Array(N * 3);
+  const col = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    pos[i*3]   = randFloat(-1800, 1800);
+    pos[i*3+1] = randFloat(-400, 400);
+    pos[i*3+2] = randFloat(-1800, 1800);
+    col[i*3]   = 0; col[i*3+1] = randFloat(0.6, 1); col[i*3+2] = randFloat(0.8, 1);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
+    size: 3.5, vertexColors: true, sizeAttenuation: true,
+    transparent: true, opacity: 0.65
+  })));
+})();
+
+// ═══════════════════════════════════════════════════
+// PLANET
+// ═══════════════════════════════════════════════════
+const planetGroup = new THREE.Group();
+scene.add(planetGroup);
+
+// Solid core
+const coreGeo = new THREE.SphereGeometry(72, 48, 48);
+const coreMat = new THREE.MeshBasicMaterial({ color: 0x000e2a });
+planetGroup.add(new THREE.Mesh(coreGeo, coreMat));
+
+// Coarse wireframe — visible grid
+const coarseGeo = new THREE.SphereGeometry(72.6, 22, 22);
+const coarseMat = new THREE.MeshBasicMaterial({
+  color: 0x0055ff, wireframe: true, transparent: true, opacity: 0.55
+});
+const coarseWire = new THREE.Mesh(coarseGeo, coarseMat);
+planetGroup.add(coarseWire);
+
+// Fine wireframe
+const fineGeo = new THREE.SphereGeometry(72.4, 44, 44);
+const fineMat = new THREE.MeshBasicMaterial({
+  color: 0x0033bb, wireframe: true, transparent: true, opacity: 0.18
+});
+const fineWire = new THREE.Mesh(fineGeo, fineMat);
+planetGroup.add(fineWire);
+
+// Atmosphere glow (back-face expanded sphere)
+const atmGeo = new THREE.SphereGeometry(82, 32, 32);
+const atmMat = new THREE.MeshBasicMaterial({
+  color: 0x0033ff, transparent: true, opacity: 0.06, side: THREE.BackSide
+});
+planetGroup.add(new THREE.Mesh(atmGeo, atmMat));
+
+const atmGeo2 = new THREE.SphereGeometry(90, 32, 32);
+const atmMat2 = new THREE.MeshBasicMaterial({
+  color: 0x001177, transparent: true, opacity: 0.03, side: THREE.BackSide
+});
+planetGroup.add(new THREE.Mesh(atmGeo2, atmMat2));
+
+// ═══════════════════════════════════════════════════
+// SPIROGRAPH ORBITAL RINGS (the beautiful pattern from Image 1)
+// ═══════════════════════════════════════════════════
+const spiroGroup = new THREE.Group();
+scene.add(spiroGroup);
+
+// Many great circles at incremental inclinations
+for (let i = 0; i < 30; i++) {
+  const incl = (i / 30) * Math.PI;
+  const pts = [];
+  const R = 73.5;
+  for (let j = 0; j <= 160; j++) {
+    const a = (j / 160) * TAU;
+    pts.push(new THREE.Vector3(
+      Math.cos(a) * R,
+      Math.sin(a) * Math.cos(incl) * R,
+      Math.sin(a) * Math.sin(incl) * R
+    ));
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineBasicMaterial({
+    color: 0x0044cc, transparent: true,
+    opacity: 0.22 + (i % 5 === 0 ? 0.12 : 0)
+  });
+  spiroGroup.add(new THREE.Line(geo, mat));
+}
+
+// Equatorial spiral fan
+for (let i = 0; i < 18; i++) {
+  const angle = (i / 18) * TAU;
+  const pts = [];
+  for (let j = 0; j <= 60; j++) {
+    const t = j / 60;
+    const r = 73.5;
+    const a = angle + t * 0.3;
+    pts.push(new THREE.Vector3(
+      Math.cos(a) * r * Math.cos(t * 0.5),
+      Math.sin(t * 1.2) * r * 0.3,
+      Math.sin(a) * r * Math.cos(t * 0.5)
+    ));
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  spiroGroup.add(new THREE.Line(geo, new THREE.LineBasicMaterial({
+    color: 0x0033aa, transparent: true, opacity: 0.15
+  })));
+}
+
+// ═══════════════════════════════════════════════════
+// CONCENTRIC ORBITAL DISTANCE RINGS
+// ═══════════════════════════════════════════════════
+for (let r = 0; r < 9; r++) {
+  const radius = 88 + r * 13;
+  const pts = [];
+  for (let i = 0; i <= 160; i++) {
+    const a = (i / 160) * TAU;
+    pts.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  scene.add(new THREE.Line(geo, new THREE.LineBasicMaterial({
+    color: 0x002277, transparent: true, opacity: 0.22 - r * 0.018
+  })));
+}
+
+// Dotted concentric rings (the "target" circles from Image 1)
+for (let r = 0; r < 5; r++) {
+  const radius = 88 + r * 10;
+  const pts = [];
+  for (let i = 0; i < 90; i++) {
+    const a = (i / 90) * TAU;
+    pts.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(
+    new Float32Array(pts.flatMap(p => [p.x, p.y, p.z])), 3
+  ));
+  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
+    color: 0x0055aa, size: 2, sizeAttenuation: true, transparent: true, opacity: 0.35
+  })));
+}
+
+// ═══════════════════════════════════════════════════
+// ASTEROID BELT
+// ═══════════════════════════════════════════════════
+const BELT_N = 20000;
+const beltGeo = new THREE.BufferGeometry();
+const beltPos  = new Float32Array(BELT_N * 3);
+const beltCol  = new Float32Array(BELT_N * 3);
+const beltSize = new Float32Array(BELT_N);
+
+for (let i = 0; i < BELT_N; i++) {
+  const angle = randFloat(0, TAU);
+  const innerR = 165, width = 55;
+  // Non-uniform radial distribution
+  const u = Math.random();
+  const radius = innerR + width * (1 - Math.sqrt(1 - u));
+  const h = (Math.random() - 0.5) * 18;
+
+  beltPos[i*3]   = Math.cos(angle) * radius;
+  beltPos[i*3+1] = h;
+  beltPos[i*3+2] = Math.sin(angle) * radius;
+
+  beltSize[i] = randFloat(1, 3.2);
+
+  const br = randFloat(0.45, 1);
+  beltCol[i*3]   = 0;
+  beltCol[i*3+1] = br * 0.88;
+  beltCol[i*3+2] = br;
+}
+
+beltGeo.setAttribute('position', new THREE.BufferAttribute(beltPos, 3));
+beltGeo.setAttribute('color',    new THREE.BufferAttribute(beltCol, 3));
+const asteroidBelt = new THREE.Points(beltGeo, new THREE.PointsMaterial({
+  size: 2, vertexColors: true, sizeAttenuation: true, transparent: true, opacity: 0.82
+}));
+scene.add(asteroidBelt);
+
+// ═══════════════════════════════════════════════════
+// WIREFRAME DIAMOND PROBE
+// ═══════════════════════════════════════════════════
+function buildProbe() {
+  const g = new THREE.Group();
+
+  // Outer octahedron
+  const oGeo = new THREE.OctahedronGeometry(17, 0);
+  const oMat = new THREE.MeshBasicMaterial({
+    color: 0x4499ff, wireframe: true, transparent: true, opacity: 0.95
+  });
+  g.add(new THREE.Mesh(oGeo, oMat));
+
+  // Inner fill (dark)
+  const iGeo = new THREE.OctahedronGeometry(15, 0);
+  g.add(new THREE.Mesh(iGeo, new THREE.MeshBasicMaterial({
+    color: 0x000e2a, transparent: true, opacity: 0.7
+  })));
+
+  // Vertex glow points
+  const vPos = oGeo.attributes.position;
+  const dotPts = [];
+  for (let i = 0; i < vPos.count; i++) {
+    dotPts.push(new THREE.Vector3(vPos.getX(i), vPos.getY(i), vPos.getZ(i)));
+  }
+  const dGeo = new THREE.BufferGeometry().setFromPoints(dotPts);
+  g.add(new THREE.Points(dGeo, new THREE.PointsMaterial({
+    color: 0x88ccff, size: 4, sizeAttenuation: true
+  })));
+
+  // Radial spokes from center
+  const sLineMat = new THREE.LineBasicMaterial({ color: 0x2266bb, transparent: true, opacity: 0.5 });
+  for (let i = 0; i < dotPts.length; i++) {
+    const sGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), dotPts[i]]);
+    g.add(new THREE.Line(sGeo, sLineMat));
+  }
+
+  // Cross-connection ring around equator
+  const eqPts = [];
+  for (let i = 0; i <= 64; i++) {
+    const a = (i / 64) * TAU;
+    eqPts.push(new THREE.Vector3(Math.cos(a)*14, 0, Math.sin(a)*14));
+  }
+  g.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(eqPts),
+    new THREE.LineBasicMaterial({ color: 0x3388dd, transparent: true, opacity: 0.45 })
+  ));
+
+  return g;
+}
+const probe = buildProbe();
+scene.add(probe);
+
+// Probe orbit path
+(function() {
+  const pts = [];
+  for (let i = 0; i <= 200; i++) {
+    const a = (i / 200) * TAU;
+    pts.push(new THREE.Vector3(
+      Math.cos(a) * 235,
+      Math.sin(a * 0.32) * 32 - 38,
+      Math.sin(a) * 182
+    ));
+  }
+  scene.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: 0x112244, transparent: true, opacity: 0.35 })
+  ));
+})();
+
+// ═══════════════════════════════════════════════════
+// TRAJECTORY ARC FAN (Image 2 style)
+// ═══════════════════════════════════════════════════
+const arcGroup = new THREE.Group();
+scene.add(arcGroup);
+
+const ARC_ORIGIN = new THREE.Vector3(-380, -230, 10);
+const arcTargets = [
+  new THREE.Vector3( 95,  65,  10),
+  new THREE.Vector3(118,  52,  36),
+  new THREE.Vector3(107,  90, -18),
+  new THREE.Vector3( 82,  58,  42),
+  new THREE.Vector3(135,  84, -26),
+  new THREE.Vector3(100, 112,  14),
+];
+
+arcTargets.forEach((tgt, idx) => {
+  const ctrl = new THREE.Vector3(
+    (ARC_ORIGIN.x + tgt.x) * 0.5 + randFloat(-60, 60),
+    (ARC_ORIGIN.y + tgt.y) * 0.5 + 70 + idx * 22,
+    (ARC_ORIGIN.z + tgt.z) * 0.5 + randFloat(-20, 20)
+  );
+  const curve = new THREE.QuadraticBezierCurve3(ARC_ORIGIN, ctrl, tgt);
+  const pts = curve.getPoints(100);
+  arcGroup.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({
+      color: 0x0088cc, transparent: true, opacity: 0.38 + idx * 0.04
+    })
+  ));
+  // Endpoint dot
+  arcGroup.add(new THREE.Points(
+    new THREE.BufferGeometry().setFromPoints([tgt]),
+    new THREE.PointsMaterial({ color: 0x00ccff, size: 5 })
+  ));
+});
+// Origin marker
+arcGroup.add(new THREE.Points(
+  new THREE.BufferGeometry().setFromPoints([ARC_ORIGIN]),
+  new THREE.PointsMaterial({ color: 0x0099ff, size: 6 })
+));
+
+// ═══════════════════════════════════════════════════
+// ANIMATION LOOP
+// ═══════════════════════════════════════════════════
+const clock = new THREE.Clock();
+let beltVisible = true;
+let viewIndex = 0;
+
+const VIEW_PRESETS = [
+  { pos: new THREE.Vector3(0, 180, 560),  look: new THREE.Vector3(0, 0, 0) },
+  { pos: new THREE.Vector3(0, 650, 10),   look: new THREE.Vector3(0, 0, 0) },
+  { pos: new THREE.Vector3(560, 60, 100), look: new THREE.Vector3(0, 0, 0) },
+  { pos: new THREE.Vector3(-80, 120, 350),look: new THREE.Vector3(0, 0, 0) },
+];
+
+function lerpCamTo(targetPos, duration = 1.2) {
+  const startPos = camera.position.clone();
+  const startTime = performance.now();
+  function step(now) {
+    const t = Math.min((now - startTime) / (duration * 1000), 1);
+    const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t; // easeInOut
+    camera.position.lerpVectors(startPos, targetPos, ease);
+    camera.lookAt(0, 0, 0);
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// Radar canvas
+const radarCanvas = document.getElementById('radarCanvas');
+const rCtx = radarCanvas.getContext('2d');
+let radarAngle = 0;
+
+function drawRadar() {
+  rCtx.clearRect(0, 0, 80, 80);
+  const cx = 40, cy = 40, r = 34;
+
+  rCtx.strokeStyle = 'rgba(0,229,255,0.18)';
+  rCtx.lineWidth = 0.8;
+  for (let i = 1; i <= 3; i++) {
+    rCtx.beginPath();
+    rCtx.arc(cx, cy, r * i / 3, 0, TAU);
+    rCtx.stroke();
+  }
+  rCtx.beginPath();
+  rCtx.moveTo(cx - r, cy); rCtx.lineTo(cx + r, cy);
+  rCtx.moveTo(cx, cy - r); rCtx.lineTo(cx, cy + r);
+  rCtx.stroke();
+
+  // Sweep
+  const grad = rCtx.createConicalGradient
+    ? null : null; // fallback
+  const sx = cx + Math.cos(radarAngle) * r;
+  const sy = cy + Math.sin(radarAngle) * r;
+  rCtx.strokeStyle = 'rgba(0,229,255,0.6)';
+  rCtx.lineWidth = 1.2;
+  rCtx.beginPath();
+  rCtx.moveTo(cx, cy); rCtx.lineTo(sx, sy);
+  rCtx.stroke();
+
+  // Probe blip
+  const pa = clock.getElapsedTime() * 0.25;
+  const px = cx + Math.cos(pa) * r * 0.85;
+  const py = cy + Math.sin(pa) * r * 0.7;
+  rCtx.beginPath();
+  rCtx.arc(px, py, 2, 0, TAU);
+  rCtx.fillStyle = 'rgba(0,229,255,0.9)';
+  rCtx.fill();
+
+  radarAngle += 0.03;
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // Rotate planet wireframes
+  coarseWire.rotation.y = t * 0.07;
+  fineWire.rotation.y   = -t * 0.04;
+  spiroGroup.rotation.y = t * 0.035;
+
+  // Orbit probe
+  const pa = t * 0.24;
+  probe.position.set(
+    Math.cos(pa) * 235,
+    Math.sin(pa * 0.32) * 32 - 38,
+    Math.sin(pa) * 182
+  );
+  probe.rotation.x = t * 0.38;
+  probe.rotation.y = t * 0.55;
+
+  // Belt slow rotation
+  asteroidBelt.rotation.y = t * 0.013;
+
+  // Arc group subtle drift
+  arcGroup.rotation.y = Math.sin(t * 0.08) * 0.04;
+
+  // Glow pulse
+  sunLight.intensity = 2.2 + Math.sin(t * 1.2) * 0.25;
+
+  // MET timer
+  const sec = Math.floor(t);
+  document.getElementById('met').textContent =
+    String(Math.floor(sec/3600)).padStart(2,'0') + ':' +
+    String(Math.floor((sec%3600)/60)).padStart(2,'0') + ':' +
+    String(sec%60).padStart(2,'0');
+  document.getElementById('distSol').textContent =
+    (2.76 + Math.sin(t*0.09)*0.022).toFixed(3) + ' AU';
+
+  drawRadar();
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+
+// Resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ═══════════════════════════════════════════════════
+// LOADER DISMISS
+// ═══════════════════════════════════════════════════
+const loaderStages = ['BUILDING STARFIELD...','LOADING PLANET DATA...','CALIBRATING SENSORS...','READY'];
+let si = 0;
+const statusEl = document.getElementById('loaderStatus');
+const stageInterval = setInterval(() => {
+  si++;
+  if (si < loaderStages.length) statusEl.textContent = loaderStages[si];
+}, 600);
+
+setTimeout(() => {
+  clearInterval(stageInterval);
+  const loader = document.getElementById('loader');
+  loader.style.opacity = '0';
+  setTimeout(() => loader.style.display = 'none', 1200);
+}, 2600);
+
+// ═══════════════════════════════════════════════════
+// NOTIFICATION HELPER
+// ═══════════════════════════════════════════════════
+let notifTimer = null;
+function showNotif(msg) {
+  const el = document.getElementById('notification');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(notifTimer);
+  notifTimer = setTimeout(() => el.classList.remove('show'), 2200);
+
+  const fb = document.getElementById('gestureFeedback');
+  if (fb) {
+    fb.textContent = msg.replace('◈ ', '');
+    fb.classList.add('active');
+    setTimeout(() => fb.classList.remove('active'), 2000);
+  }
+}
+
+
+// ═══════════════════════════════════════════════════
+// GESTURE DETECTION & UI
+// ═══════════════════════════════════════════════════
+const GESTURE_CFG = {
+  palm:    { emoji:'✋', name:'ORBIT MODE',   action:'MOVE HAND TO ROTATE SCENE'  },
+  pinch:   { emoji:'🤏', name:'ZOOM MODE',    action:'PINCH WIDER/NARROWER'       },
+  point:   { emoji:'☝️', name:'INSPECT MODE', action:'TARGETING OBJECT'           },
+  fist:    { emoji:'✊', name:'RESET VIEW',   action:'RETURNING TO HOME POSITION' },
+  peace:   { emoji:'✌️', name:'TOGGLE BELT',  action:'SWITCHING ASTEROID BELT'    },
+  shaka:   { emoji:'🤙', name:'CHANGE VIEW',  action:'CYCLING CAMERA PRESETS'     },
+  none:    { emoji:'🖐', name:'STANDBY',      action:'AWAITING GESTURE INPUT'     },
+  unknown: { emoji:'❓', name:'UNRECOGNIZED', action:'PLEASE TRY AGAIN'           },
+};
+
+let currentGesture = 'none';
+let prevHandX = null, prevHandY = null, prevPinchDist = null;
+let smoothX = 0, smoothY = 0;
+const SMOOTH_FACTOR = 0.12; // Even smoother
+
+// Landmarks smoothing for the skeleton
+let smoothLandmarks = null;
+const LM_SMOOTH = 0.25;
+
+let fistCooldown = false, peaceCooldown = false, shakaCooldown = false;
+
+
+
+function classifyHand(lm) {
+  // lm: array of 21 {x,y,z} landmark objects (normalized 0-1)
+  const TIPS = [4, 8, 12, 16, 20];
+  const PIPS = [3, 6, 10, 14, 18];
+
+  // Pinch first (overrides everything)
+  const pd = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
+  if (pd < 0.055) return 'pinch';
+
+  // Finger extension
+  const ext = [false, false, false, false, false];
+  // Thumb: horizontal spread from palm
+  ext[0] = Math.abs(lm[4].x - lm[2].x) > 0.045;
+  // Fingers 2-5: tip above PIP (smaller y = higher on screen)
+  for (let f = 1; f <= 4; f++) {
+    ext[f] = lm[TIPS[f]].y < lm[PIPS[f]].y - 0.01;
+  }
+  const count = ext.filter(Boolean).length;
+
+  if (count >= 4) return 'palm';
+  if (count === 0) return 'fist';
+  if (ext[1] && !ext[2] && !ext[3] && !ext[4]) return 'point';
+  if (ext[1] && ext[2] && !ext[3] && !ext[4]) return 'peace';
+  if (ext[0] && !ext[1] && !ext[2] && !ext[3] && ext[4]) return 'shaka';
+  return 'unknown';
+}
+
+function setGestureUI(g) {
+  const cfg = GESTURE_CFG[g] || GESTURE_CFG.none;
+  document.getElementById('gpEmoji').textContent   = cfg.emoji;
+  document.getElementById('gpName').textContent    = cfg.name;
+  document.getElementById('gpAction').textContent  = cfg.action;
+  const led = document.getElementById('gpLed');
+  led.classList.toggle('lit', g !== 'none' && g !== 'unknown');
+  const disp = document.getElementById('gpDisplay');
+  disp.classList.toggle('triggered', g !== 'none' && g !== 'unknown');
+  // Ref highlighting
+  document.querySelectorAll('.gp-ref').forEach(el => el.classList.remove('hi'));
+  const ref = document.getElementById('ref-' + g);
+  if (ref) ref.classList.add('hi');
+}
+
+function handleGesture(g, lm) {
+  const wrist = lm[0];
+
+  // One-shot gestures
+  if (g === 'fist' && !fistCooldown) {
+    fistCooldown = true;
+    setTimeout(() => fistCooldown = false, 800);
+    controls.autoRotate = true;
+    lerpCamTo(VIEW_PRESETS[0].pos);
+    showNotif('◈ VIEW RESET');
+    return;
+  }
+  if (g === 'peace' && !peaceCooldown) {
+    peaceCooldown = true;
+    setTimeout(() => peaceCooldown = false, 1000);
+    beltVisible = !beltVisible;
+    asteroidBelt.visible = beltVisible;
+    showNotif(beltVisible ? '◈ BELT: VISIBLE' : '◈ BELT: HIDDEN');
+    return;
+  }
+  if (g === 'shaka' && !shakaCooldown) {
+    shakaCooldown = true;
+    setTimeout(() => shakaCooldown = false, 1200);
+    viewIndex = (viewIndex + 1) % VIEW_PRESETS.length;
+    lerpCamTo(VIEW_PRESETS[viewIndex].pos);
+    controls.autoRotate = false;
+    showNotif('◈ VIEW ' + (viewIndex + 1) + '/' + VIEW_PRESETS.length);
+    return;
+  }
+
+  // Continuous: inspect / reticle
+  if (g === 'point') {
+    const tip = lm[8]; // index fingertip
+    const reticle = document.getElementById('reticle');
+    reticle.style.opacity = '1';
+    // Point smoothing
+    smoothX += (tip.x - smoothX) * SMOOTH_FACTOR;
+    smoothY += (tip.y - smoothY) * SMOOTH_FACTOR;
+    
+    // Mirror x (video is mirrored)
+    reticle.style.left = ((1 - smoothX) * window.innerWidth) + 'px';
+    reticle.style.top  = (smoothY * window.innerHeight) + 'px';
+
+    return;
+  }
+
+  // Orbit: palm moves → rotate scene
+  if (g === 'palm') {
+    controls.autoRotate = false;
+    if (prevHandX !== null) {
+      // Smooth wrist position
+      smoothX += (wrist.x - smoothX) * SMOOTH_FACTOR;
+      smoothY += (wrist.y - smoothY) * SMOOTH_FACTOR;
+      
+      const dx = smoothX - prevHandX;
+      const dy = smoothY - prevHandY;
+      const sph = new THREE.Spherical().setFromVector3(camera.position);
+      sph.theta -= dx * 4.5;
+      sph.phi   += dy * 3;
+      sph.phi    = Math.max(0.1, Math.min(Math.PI - 0.1, sph.phi));
+      camera.position.setFromSpherical(sph);
+      camera.lookAt(0, 0, 0);
+    }
+    prevHandX = smoothX;
+    prevHandY = smoothY;
+    return;
+  }
+
+
+  // Zoom: pinch distance
+  if (g === 'pinch') {
+    controls.autoRotate = false;
+    const pd = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
+    if (prevPinchDist !== null) {
+      const delta = prevPinchDist - pd;
+      const sph = new THREE.Spherical().setFromVector3(camera.position);
+      sph.radius = Math.max(controls.minDistance, Math.min(controls.maxDistance, sph.radius + delta * 1400));
+      camera.position.setFromSpherical(sph);
+      camera.lookAt(0, 0, 0);
+    }
+    prevPinchDist = pd;
+  } else {
+    prevPinchDist = null;
+  }
+
+  prevHandX = wrist.x;
+  prevHandY = wrist.y;
+}
+
+
+// ═══════════════════════════════════════════════════
+// MEDIAPIPE INTEGRATION
+// ═══════════════════════════════════════════════════
+const camVideo    = document.getElementById('camVideo');
+const gestCanvas  = document.getElementById('gestureCanvas');
+const gestCtx     = gestCanvas.getContext('2d');
+
+let handsModel = null;
+let camActive  = false;
+
+const HAND_STYLE_LINE = 'rgba(0,200,255,0.6)';
+const HAND_STYLE_DOT  = 'rgba(0,230,255,0.92)';
+
+function drawHandLandmarks(lm, w, h) {
+  const CONNECTIONS = [
+    [0,1],[1,2],[2,3],[3,4],
+    [0,5],[5,6],[6,7],[7,8],
+    [0,9],[9,10],[10,11],[11,12],
+    [0,13],[13,14],[14,15],[15,16],
+    [0,17],[17,18],[18,19],[19,20],
+    [5,9],[9,13],[13,17]
+  ];
+  
+  // Smooth landmarks for drawing
+  if (!smoothLandmarks) {
+    smoothLandmarks = JSON.parse(JSON.stringify(lm));
+  } else {
+    for (let i = 0; i < 21; i++) {
+      smoothLandmarks[i].x += (lm[i].x - smoothLandmarks[i].x) * LM_SMOOTH;
+      smoothLandmarks[i].y += (lm[i].y - smoothLandmarks[i].y) * LM_SMOOTH;
+    }
+  }
+
+  gestCtx.shadowBlur = 10;
+  gestCtx.shadowColor = 'rgba(0,229,255,1)';
+  gestCtx.strokeStyle = 'rgba(0,230,255,0.4)';
+  gestCtx.lineWidth   = 0.8;
+  
+  for (const [a, b] of CONNECTIONS) {
+    gestCtx.beginPath();
+    gestCtx.moveTo((1 - smoothLandmarks[a].x) * w, smoothLandmarks[a].y * h);
+    gestCtx.lineTo((1 - smoothLandmarks[b].x) * w, smoothLandmarks[b].y * h);
+    gestCtx.stroke();
+  }
+  
+  for (let i = 0; i < 21; i++) {
+    const x = (1 - smoothLandmarks[i].x) * w;
+    const y = smoothLandmarks[i].y * h;
+    gestCtx.beginPath();
+    gestCtx.arc(x, y, i === 0 || [4,8,12,16,20].includes(i) ? 2.5 : 1.2, 0, TAU);
+    gestCtx.fillStyle = [4,8,12,16,20].includes(i) ? '#00e5ff' : 'rgba(0,229,255,0.8)';
+    gestCtx.fill();
+    
+    // Add micro lines to dots for "technical" look
+    if ([0,4,8,12,16,20].includes(i)) {
+      gestCtx.beginPath();
+      gestCtx.arc(x, y, 5, 0, TAU);
+      gestCtx.strokeStyle = 'rgba(0,229,255,0.2)';
+      gestCtx.lineWidth = 0.5;
+      gestCtx.stroke();
+    }
+  }
+}
+
+
+function initMediaPipe() {
+  handsModel = new Hands({
+    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${f}`
+  });
+  handsModel.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.72,
+    minTrackingConfidence: 0.65,
+  });
+
+  handsModel.onResults(results => {
+    const W = gestCanvas.width, H = gestCanvas.height;
+    gestCtx.clearRect(0, 0, W, H);
+
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+      // Find the Right hand specifically
+      let handIdx = -1;
+      for (let i = 0; i < results.multiHandedness.length; i++) {
+        // MediaPipe "Right" hand in mirrored view is physical Right hand
+        if (results.multiHandedness[i].label === 'Right') {
+          handIdx = i;
+          break;
+        }
+      }
+
+      if (handIdx === -1) {
+        currentGesture = 'none';
+        setGestureUI('none');
+        return;
+      }
+
+      const lm = results.multiHandLandmarks[handIdx];
+      
+      // Update canvas size to match window
+      if (gestCanvas.width !== window.innerWidth || gestCanvas.height !== window.innerHeight) {
+        gestCanvas.width = window.innerWidth;
+        gestCanvas.height = window.innerHeight;
+      }
+      
+      drawHandLandmarks(lm, gestCanvas.width, gestCanvas.height);
+
+      const g = classifyHand(lm);
+
+      if (g !== currentGesture) {
+        currentGesture = g;
+        setGestureUI(g);
+        // Visual feedback for gesture change
+        if (g !== 'none' && g !== 'unknown') {
+          const cfg = GESTURE_CFG[g];
+          showNotif('◈ ' + cfg.name);
+        }
+      }
+      
+      if (g !== 'point') document.getElementById('reticle').style.opacity = '0';
+      handleGesture(g, lm);
+    } else {
+      currentGesture = 'none';
+      setGestureUI('none');
+      prevHandX = prevHandY = prevPinchDist = null;
+      document.getElementById('reticle').style.opacity = '0';
+    }
+  });
+}
+
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Auto-click start if possible or show a splash
+  const splash = document.createElement('div');
+  splash.id = 'startSplash';
+  splash.innerHTML = `
+    <div style="position:fixed; inset:0; background:rgba(0,3,8,0.9); z-index:10000; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+      <div style="text-align:center;">
+        <div class="loader-logo" style="font-size:32px; margin-bottom:20px;">INITIATE NEURAL LINK</div>
+        <div style="font-size:10px; letter-spacing:0.4em; color:var(--cyan); opacity:0.6;">CLICK ANYWHERE TO BEGIN GESTURE CONTROL</div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(splash);
+
+  splash.addEventListener('click', async () => {
+    splash.style.opacity = '0';
+    setTimeout(() => splash.remove(), 1000);
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480, facingMode: 'user' }
+      });
+      camVideo.srcObject = stream;
+      await camVideo.play();
+
+      if (!handsModel) initMediaPipe();
+
+      const mpCam = new Camera(camVideo, {
+        onFrame: async () => { if (handsModel) await handsModel.send({ image: camVideo }); },
+        width: 640, height: 480
+      });
+      mpCam.start();
+
+      camActive = true;
+      showNotif('◈ INTERFACE ACTIVE');
+    } catch (err) {
+      console.error(err);
+      showNotif('◈ ACCESS DENIED');
+    }
+  });
+});
+
+</script>
+</body>
+</html>
