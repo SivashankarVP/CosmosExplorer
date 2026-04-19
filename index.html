@@ -24,9 +24,10 @@ body {
   overflow: hidden;
   font-family: 'Orbitron', 'Share Tech Mono', monospace;
   color: var(--cyan);
-  cursor: none; /* Hide mouse cursor */
+  cursor: crosshair; /* RESTORE CURSOR - Essential for debugging "not loading" issues */
   user-select: none;
 }
+
 
 
 #radar { display: none !important; }
@@ -447,6 +448,11 @@ body::after {
 <body>
 
 <div id="interfaceGlow"></div>
+
+<!-- Failsafe Debug UI -->
+<div id="debugConsole" style="position:fixed; bottom:10px; right:10px; font-family:monospace; font-size:10px; color:rgba(0,229,255,0.5); z-index:10001; pointer-events:none; max-width:300px; text-align:right;"></div>
+<button id="failsafeBtn" style="position:fixed; top:20px; left:20px; z-index:10002; background:rgba(0,136,255,0.2); border:1px solid var(--cyan); color:var(--cyan); padding:8px 12px; font-family:'Orbitron'; font-size:10px; cursor:pointer; display:none;">◈ RE-INITIATE NEURAL LINK</button>
+
 
 
 
@@ -1248,27 +1254,49 @@ function initMediaPipe() {
 
 
 async function startEngine() {
+  const btn = document.getElementById('failsafeBtn');
+  const dbg = document.getElementById('debugConsole');
+  const log = (m) => { dbg.innerHTML = m + '<br>' + dbg.innerHTML; console.log(m); };
+
   try {
+    log('INITIALIZING SENSORS...');
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
     });
     camVideo.srcObject = stream;
     await camVideo.play();
+    log('CAMERA ACTIVE');
+
     if (!handsModel) initMediaPipe();
-    const mpCam = new Camera(camVideo, {
-      onFrame: async () => { if (handsModel) await handsModel.send({ image: camVideo }); },
-      width: 640, height: 480
-    });
-    mpCam.start();
+    
+    // Check if Camera (MediaPipe helper) exists
+    if (typeof Camera !== 'undefined') {
+      const mpCam = new Camera(camVideo, {
+        onFrame: async () => { if (handsModel) await handsModel.send({ image: camVideo }); },
+        width: 640, height: 480
+      });
+      mpCam.start();
+      log('AI TRACKING STARTED');
+    } else {
+      log('FALLBACK TRACKING MODE');
+      const process = async () => {
+        if (handsModel) await handsModel.send({ image: camVideo });
+        requestAnimationFrame(process);
+      };
+      process();
+    }
+    
     camActive = true;
     showNotif('◈ SYSTEM ONLINE');
+    btn.style.display = 'none';
   } catch (err) {
-    console.error('Core Error:', err);
+    log('ERROR: ' + err.message);
     showNotif('◈ PERMISSION REQUIRED');
-    // Fallback: Click anywhere to retry if blocked
-    document.body.addEventListener('click', startEngine, { once: true });
+    btn.style.display = 'block';
+    btn.onclick = startEngine;
   }
 }
+
 
 document.addEventListener('DOMContentLoaded', () => {
   startEngine();
