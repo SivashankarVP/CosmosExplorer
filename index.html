@@ -53,6 +53,11 @@ body::after {
   transition: filter 0.1s;
 }
 
+#startSplash {
+  cursor: crosshair !important; /* Restore cursor for the start screen */
+}
+
+
 #interfaceGlow {
   position: fixed;
   inset: 0;
@@ -1456,13 +1461,20 @@ document.addEventListener('DOMContentLoaded', () => {
   document.body.appendChild(splash);
 
   splash.addEventListener('click', async () => {
-    splash.style.opacity = '0';
-    setTimeout(() => splash.remove(), 1000);
-    
     try {
+      showNotif('◈ REQUESTING SENSORS...');
+      
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, facingMode: 'user' }
+        video: { 
+          width: { ideal: 640 }, 
+          height: { ideal: 480 }, 
+          facingMode: 'user' 
+        }
       });
+      
+      splash.style.opacity = '0';
+      setTimeout(() => splash.remove(), 1000);
+      
       camVideo.srcObject = stream;
       await camVideo.play();
 
@@ -1477,11 +1489,21 @@ document.addEventListener('DOMContentLoaded', () => {
       camActive = true;
       showNotif('◈ INTERFACE ACTIVE');
     } catch (err) {
-      console.error(err);
-      showNotif('◈ ACCESS DENIED');
+      console.error('Camera Error:', err);
+      // More specific error feedback
+      const errorMsg = err.name === 'NotAllowedError' ? 'ACCESS DENIED' : 'CAMERA NOT FOUND';
+      showNotif('◈ ' + errorMsg);
+      
+      // Update splash text to show error
+      const statusText = splash.querySelector('.loader-logo');
+      if (statusText) {
+        statusText.style.color = '#ff4444';
+        statusText.textContent = errorMsg;
+      }
     }
   });
 });
+
 
 </script>
 </body>
