@@ -877,14 +877,13 @@ function animate() {
   }
 
   // Apply Physics to Camera Zoom
-  targetRadius += zoomVelocity;
-  zoomVelocity *= ZOOM_FRICTION;
-  
+  // Apply Absolute Zoom Smoothing (Reference Style)
   const sph = new THREE.Spherical().setFromVector3(camera.position);
-  sph.radius += (targetRadius - sph.radius) * 0.15;
-  sph.radius = Math.max(controls.minDistance, Math.min(controls.maxDistance, sph.radius));
+  sph.radius += (targetRadius - sph.radius) * 0.1; // Smoothly approach target radius
+  
   camera.position.setFromSpherical(sph);
   camera.lookAt(0, 0, 0);
+
 
   controls.update();
   renderer.render(scene, camera);
@@ -942,19 +941,16 @@ let currentGesture = 'none';
 let gestureBuffer = [];
 const BUFFER_SIZE = 5;
 
-let prevHandX = null, prevHandY = null, prevPinchDist = null;
+let prevHandX = null, prevHandY = null;
 let smoothX = 0, smoothY = 0;
-const SMOOTH_FACTOR = 0.1; // Even smoother for "physics" feel
+const SMOOTH_FACTOR = 0.1;
 
-// Physics-based Zooming
+// Absolute Zooming (Reference Style)
 let targetRadius = 560;
-let zoomVelocity = 0;
-const ZOOM_FRICTION = 0.85; // Slightly more friction for control
-const ZOOM_SENSE = 3600; // Increased sensitivity for dramatic zoom
 
 // Landmarks smoothing
 let smoothLandmarks = null;
-const LM_SMOOTH = 0.18; // Even smoother tracking
+const LM_SMOOTH = 0.2;
 
 
 let fistCooldown = false, peaceCooldown = false, shakaCooldown = false;
@@ -1080,19 +1076,21 @@ function handleGesture(g, lm) {
 
 
 
-  // Zoom: pinch with physics
+  // Zoom: Absolute distance mapping (Reference Style)
+  const thumbTip = lm[4];
+  const indexTip = lm[8];
+  const zoomDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+  
+  // Map pinch distance to radius: Wide pinch = Zoom In, Tight pinch = Zoom Out
+  const pinchTarget = 1200 - (zoomDist * 3200);
+  targetRadius = Math.max(controls.minDistance, Math.min(controls.maxDistance, pinchTarget));
+  
   if (g === 'pinch') {
-    const pd = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
-    if (prevPinchDist !== null) {
-      const delta = prevPinchDist - pd;
-      zoomVelocity += delta * ZOOM_SENSE;
-      canvas.classList.add('zoom-pulse');
-      setTimeout(() => canvas.classList.remove('zoom-pulse'), 100);
-    }
-    prevPinchDist = pd;
-  } else {
-    prevPinchDist = null;
+    const canvas = document.getElementById('spaceCanvas');
+    canvas.classList.add('zoom-pulse');
+    setTimeout(() => canvas.classList.remove('zoom-pulse'), 100);
   }
+
 
 
 
@@ -1121,13 +1119,8 @@ function drawHandLandmarks(lm, w, h) {
     [0,9],[9,10],[10,11],[11,12],
     [0,13],[13,14],[14,15],[15,16],
     [0,17],[17,18],[18,19],[19,20],
-    [5,9],[9,13],[13,17],
-    // "Webbing" connections to match reference web-hand look
-    [6,10],[10,14],[14,18],
-    [7,11],[11,15],[15,19],
-    [8,12],[12,16],[16,20]
+    [5,9],[9,13],[13,17]
   ];
-
   
   // Smooth landmarks for drawing
   if (!smoothLandmarks) {
