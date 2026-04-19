@@ -23,9 +23,10 @@ body {
   overflow: hidden;
   font-family: 'Orbitron', 'Share Tech Mono', monospace;
   color: var(--cyan);
-  cursor: crosshair;
+  cursor: none; /* Hide mouse cursor */
   user-select: none;
 }
+
 
 #radar { display: none !important; }
 
@@ -591,12 +592,14 @@ camera.position.set(0, 180, 560);
 camera.lookAt(0, 0, 0);
 
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enabled = false; // Disable all mouse/touch control
 controls.enableDamping = true;
 controls.dampingFactor = 0.055;
 controls.minDistance = 110;
 controls.maxDistance = 2400;
 controls.autoRotate = true;
 controls.autoRotateSpeed = 0.18;
+
 
 // Lights
 scene.add(new THREE.AmbientLight(0x001122, 3));
