@@ -637,16 +637,21 @@ const ringRandomDirs = [];
 // ═══════════════════════════════════════════════════
 // PARTICLE PLANET (Saturn Style)
 // ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
+// PARTICLE PLANET (Saturn Style)
+// ═══════════════════════════════════════════════════
 (function buildParticleSaturn() {
+  // Planet Core Particles
   const saturnGeo = new THREE.SphereGeometry(72, 96, 96);
-  const saturnMat = new THREE.PointsMaterial({ color: 0x0088ff, size: 0.8, transparent: true, opacity: 0.9 });
+  // Increase particle size for visibility
+  const saturnMat = new THREE.PointsMaterial({ color: 0x0088ff, size: 2.5, transparent: true, opacity: 0.9 });
   saturn = new THREE.Points(saturnGeo, saturnMat);
   scene.add(saturn);
 
   const sPos = saturn.geometry.attributes.position.array;
   for (let i = 0; i < sPos.length; i += 3) {
     saturnOrigPos.push(sPos[i], sPos[i+1], sPos[i+2]);
-    saturnRandomDirs.push((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12);
+    saturnRandomDirs.push((Math.random() - 0.5) * 15, (Math.random() - 0.5) * 15, (Math.random() - 0.5) * 15);
   }
 
   // Rings as particles
@@ -663,13 +668,18 @@ const ringRandomDirs = [];
     rPositions[i*3+1] = y;
     rPositions[i*3+2] = z;
     ringOrigPos.push(x, y, z);
-    ringRandomDirs.push((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
+    ringRandomDirs.push((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10);
   }
   ringGeo.setAttribute('position', new THREE.BufferAttribute(rPositions, 3));
-  rings = new THREE.Points(ringGeo, new THREE.PointsMaterial({ color: 0x00ffff, size: 0.6, transparent: true, opacity: 0.6 }));
+  rings = new THREE.Points(ringGeo, new THREE.PointsMaterial({ color: 0x00ffff, size: 1.5, transparent: true, opacity: 0.6 }));
   rings.rotation.x = Math.PI / 3.5;
   scene.add(rings);
+  
+  // Add a center light flare just in case
+  const flare = new THREE.Mesh(new THREE.SphereGeometry(4), new THREE.MeshBasicMaterial({ color: 0x00e5ff }));
+  scene.add(flare);
 })();
+
 
 // Starfield update
 (function buildStarfield() {
@@ -897,7 +907,9 @@ function animate() {
 
 
 
+// Start animation immediately
 animate();
+
 
 // Resize
 window.addEventListener('resize', () => {
