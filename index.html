@@ -445,16 +445,8 @@ body::after {
 </head>
 <body>
 
-<!-- LOADER -->
-<div id="loader">
-  <div class="loader-logo">COSMOS</div>
-  <div class="loader-sub">Deep Space Explorer — Hand Gesture Interface</div>
-  <div class="loader-bar-wrap"><div class="loader-bar-fill"></div></div>
-  <div id="loaderStatus" class="loader-sub">INITIALIZING SCENE...</div>
-  <div id="gestureFeedback">STANDBY</div>
-</div>
-
 <div id="interfaceGlow"></div>
+
 
 
 <!-- THREE.JS CANVAS -->
@@ -1078,23 +1070,8 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ═══════════════════════════════════════════════════
-// LOADER DISMISS
-// ═══════════════════════════════════════════════════
-const loaderStages = ['BUILDING STARFIELD...','LOADING PLANET DATA...','CALIBRATING SENSORS...','READY'];
-let si = 0;
-const statusEl = document.getElementById('loaderStatus');
-const stageInterval = setInterval(() => {
-  si++;
-  if (si < loaderStages.length) statusEl.textContent = loaderStages[si];
-}, 600);
+// No loader logic
 
-setTimeout(() => {
-  clearInterval(stageInterval);
-  const loader = document.getElementById('loader');
-  loader.style.opacity = '0';
-  setTimeout(() => loader.style.display = 'none', 1200);
-}, 2600);
 
 // ═══════════════════════════════════════════════════
 // NOTIFICATION HELPER
@@ -1446,63 +1423,33 @@ function initMediaPipe() {
 }
 
 
+async function startEngine() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
+    });
+    camVideo.srcObject = stream;
+    await camVideo.play();
+    if (!handsModel) initMediaPipe();
+    const mpCam = new Camera(camVideo, {
+      onFrame: async () => { if (handsModel) await handsModel.send({ image: camVideo }); },
+      width: 640, height: 480
+    });
+    mpCam.start();
+    camActive = true;
+    showNotif('◈ SYSTEM ONLINE');
+  } catch (err) {
+    console.error('Core Error:', err);
+    showNotif('◈ PERMISSION REQUIRED');
+    // Fallback: Click anywhere to retry if blocked
+    document.body.addEventListener('click', startEngine, { once: true });
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  // Auto-click start if possible or show a splash
-  const splash = document.createElement('div');
-  splash.id = 'startSplash';
-  splash.innerHTML = `
-    <div style="position:fixed; inset:0; background:rgba(0,3,8,0.9); z-index:10000; display:flex; align-items:center; justify-content:center; cursor:pointer;">
-      <div style="text-align:center;">
-        <div class="loader-logo" style="font-size:32px; margin-bottom:20px;">INITIATE NEURAL LINK</div>
-        <div style="font-size:10px; letter-spacing:0.4em; color:var(--cyan); opacity:0.6;">CLICK ANYWHERE TO BEGIN GESTURE CONTROL</div>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(splash);
-
-  splash.addEventListener('click', async () => {
-    try {
-      showNotif('◈ REQUESTING SENSORS...');
-      
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          width: { ideal: 640 }, 
-          height: { ideal: 480 }, 
-          facingMode: 'user' 
-        }
-      });
-      
-      splash.style.opacity = '0';
-      setTimeout(() => splash.remove(), 1000);
-      
-      camVideo.srcObject = stream;
-      await camVideo.play();
-
-      if (!handsModel) initMediaPipe();
-
-      const mpCam = new Camera(camVideo, {
-        onFrame: async () => { if (handsModel) await handsModel.send({ image: camVideo }); },
-        width: 640, height: 480
-      });
-      mpCam.start();
-
-      camActive = true;
-      showNotif('◈ INTERFACE ACTIVE');
-    } catch (err) {
-      console.error('Camera Error:', err);
-      // More specific error feedback
-      const errorMsg = err.name === 'NotAllowedError' ? 'ACCESS DENIED' : 'CAMERA NOT FOUND';
-      showNotif('◈ ' + errorMsg);
-      
-      // Update splash text to show error
-      const statusText = splash.querySelector('.loader-logo');
-      if (statusText) {
-        statusText.style.color = '#ff4444';
-        statusText.textContent = errorMsg;
-      }
-    }
-  });
+  startEngine();
 });
+
 
 
 </script>
