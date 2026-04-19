@@ -456,8 +456,9 @@ body::after {
 
 
 
-<!-- THREE.JS CANVAS -->
-<canvas id="spaceCanvas"></canvas>
+<!-- No 2D gesture canvas needed for main rendering -->
+<canvas id="gestureCanvas" style="display:none;"></canvas>
+
 
 <!-- HUD -->
 <div id="hud">
@@ -622,8 +623,27 @@ const TAU = Math.PI * 2;
 // STARFIELD
 // ═══════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════
+// 3D HAND SKELETON
+// ═══════════════════════════════════════════════════
+const handGroup = new THREE.Group();
+const handPointsGeo = new THREE.BufferGeometry();
+const handPointsMat = new THREE.PointsMaterial({ color: 0x00ffff, size: 2.2, transparent: true, opacity: 0.9, sizeAttenuation: true });
+const handPoints = new THREE.Points(handPointsGeo, handPointsMat);
+
+const handLinesGeo = new THREE.BufferGeometry();
+const handLinesMat = new THREE.LineBasicMaterial({ color: 0x0088ff, transparent: true, opacity: 0.5 });
+const handLines = new THREE.LineSegments(handLinesGeo, handLinesMat);
+
+handGroup.add(handPoints);
+handGroup.add(handLines);
+handGroup.position.set(0, 0, -500); // Distance from lens
+camera.add(handGroup); // Attach to camera for HUD effect
+scene.add(camera);
+
+// ═══════════════════════════════════════════════════
 // PARTICLE ENGINE VARIABLES
 // ═══════════════════════════════════════════════════
+
 let saturn, rings, stars;
 let isExploded = false;
 let explosionFactor = 0;
@@ -841,12 +861,18 @@ function animate() {
     const targetFactor = isExploded ? 12.0 : 0;
     explosionFactor = THREE.MathUtils.lerp(explosionFactor, targetFactor, isExploded ? 0.04 : 0.15);
 
-    // Hand attraction vector in world space
-    const attractionVector = new THREE.Vector3(
-      ((1 - smoothX) - 0.5) * 600,
-      -(smoothY - 0.5) * 450,
-      0
-    );
+    // Hand attraction vector: follow the 3D hand position
+    // We target the wrist (point 0) or palm center (point 9) translated to world space
+    const attractionVector = new THREE.Vector3();
+    if (smoothLandmarks) {
+      const pm = smoothLandmarks[9];
+      attractionVector.set(
+        ((1 - pm.x) - 0.5) * 800,
+        -(pm.y - 0.5) * 600,
+        -targetRadius * 0.6 // Pull toward hand depth
+      );
+    }
+
 
     for (let i = 0; i < sAttr.count; i++) {
       const i3 = i * 3;
@@ -1130,63 +1156,51 @@ let camActive  = false;
 const HAND_STYLE_LINE = 'rgba(0,200,255,0.6)';
 const HAND_STYLE_DOT  = 'rgba(0,230,255,0.92)';
 
-function drawHandLandmarks(lm, w, h) {
+function update3DHand(lm) {
   const CONNECTIONS = [
-    [0,1],[1,2],[2,3],[3,4],
-    [0,5],[5,6],[6,7],[7,8],
-    [0,9],[9,10],[10,11],[11,12],
-    [0,13],[13,14],[14,15],[15,16],
-    [0,17],[17,18],[18,19],[19,20],
-    [5,9],[9,13],[13,17]
+    [0,1],[1,2],[2,3],[3,4], [0,5],[5,6],[6,7],[7,8],
+    [0,9],[9,10],[10,11],[11,12], [0,13],[13,14],[14,15],[15,16],
+    [0,17],[17,18],[18,19],[19,20], [5,9],[9,13],[13,17]
   ];
-  
-  // Smooth landmarks for drawing
+
+  // Smooth landmarks for 3D
   if (!smoothLandmarks) {
     smoothLandmarks = JSON.parse(JSON.stringify(lm));
   } else {
     for (let i = 0; i < 21; i++) {
       smoothLandmarks[i].x += (lm[i].x - smoothLandmarks[i].x) * LM_SMOOTH;
       smoothLandmarks[i].y += (lm[i].y - smoothLandmarks[i].y) * LM_SMOOTH;
+      smoothLandmarks[i].z += (lm[i].z - smoothLandmarks[i].z) * LM_SMOOTH;
     }
   }
 
-  gestCtx.shadowBlur = 10;
-  gestCtx.shadowColor = 'rgba(0,229,255,1)';
-  gestCtx.strokeStyle = 'rgba(0,230,255,0.4)';
-  gestCtx.lineWidth   = 0.8;
+  const positions = [];
+  const linePositions = [];
   
+  // Transform normalized coords to 3D space
+  for(let i=0; i<21; i++) {
+    const x = ((1 - smoothLandmarks[i].x) - 0.5) * 640; 
+    const y = -(smoothLandmarks[i].y - 0.5) * 480;
+    const z = smoothLandmarks[i].z * 200; // Depth normalization
+    positions.push(x, y, z);
+  }
+
   for (const [a, b] of CONNECTIONS) {
-    gestCtx.beginPath();
-    gestCtx.moveTo((1 - smoothLandmarks[a].x) * w, smoothLandmarks[a].y * h);
-    gestCtx.lineTo((1 - smoothLandmarks[b].x) * w, smoothLandmarks[b].y * h);
-    gestCtx.stroke();
-    
-    // Add glowing "Ribbons" or "Data Flow" on lines
-    if (Math.random() > 0.92) {
-      gestCtx.fillStyle = 'white';
-      gestCtx.fillRect((1 - smoothLandmarks[a].x) * w, smoothLandmarks[a].y * h, 2, 2);
-    }
+    linePositions.push(positions[a*3], positions[a*3+1], positions[a*3+2]);
+    linePositions.push(positions[b*3], positions[b*3+1], positions[b*3+2]);
   }
 
-  
-  for (let i = 0; i < 21; i++) {
-    const x = (1 - smoothLandmarks[i].x) * w;
-    const y = smoothLandmarks[i].y * h;
-    gestCtx.beginPath();
-    gestCtx.arc(x, y, i === 0 || [4,8,12,16,20].includes(i) ? 2.5 : 1.2, 0, TAU);
-    gestCtx.fillStyle = [4,8,12,16,20].includes(i) ? '#00e5ff' : 'rgba(0,229,255,0.8)';
-    gestCtx.fill();
-    
-    // Add micro lines to dots for "technical" look
-    if ([0,4,8,12,16,20].includes(i)) {
-      gestCtx.beginPath();
-      gestCtx.arc(x, y, 5, 0, TAU);
-      gestCtx.strokeStyle = 'rgba(0,229,255,0.2)';
-      gestCtx.lineWidth = 0.5;
-      gestCtx.stroke();
-    }
-  }
+  handPointsGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  handLinesGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+  handPointsGeo.attributes.position.needsUpdate = true;
+  handLinesGeo.attributes.position.needsUpdate = true;
 }
+
+function drawHandLandmarks(lm, w, h) {
+  // Keeping this for 2D debug if needed, but primarily using update3DHand
+  update3DHand(lm);
+}
+
 
 
 function initMediaPipe() {
